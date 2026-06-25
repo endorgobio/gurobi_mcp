@@ -6,156 +6,194 @@
 
 **Status**: Draft
 
-**Input**: User description: "consider the attached file to write the specifications" (Gurobi MCP Multi-User Backend brief + Azure VM + MCP server documentation)
+**Input**: User description: Gurobi MCP Multi-User Backend brief + Azure VM summary + MCP server documentation, unified with a prior parallel draft of the same feature.
+
+## Clarifications
+
+### Session 2026-06-25
+
+- Q: Should the assistant (agent) be selectable per message or fixed for a conversation thread? → A: Each chat request carries an `agent` field (`gurobot` | `explainer` | `modeler`); the agent is bound when a conversation identifier is first seen and stored with the session. Invalid values are rejected before any agent is contacted. A follow-up request whose `agent` differs from the one bound to that conversation is rejected — the agent cannot change mid-conversation, because each agent tracks its own distinct workflow state on the Gurobi side.
+- Q: What does the structured-output option mean for the response contract? → A: Proxy mode. A chat request carries a flag (and optionally a caller-supplied schema) that is forwarded to the agent's native structured-output capability; the backend returns whatever structured payload the agent emits, unmodified. The backend does not invent, validate, or coerce schemas of its own.
 
 ## User Scenarios & Testing *(mandatory)*
 
-<!--
-  User journeys ordered by importance. Each is independently testable and
-  delivers a viable slice of value on its own.
--->
+The backend is a headless JSON service. Its "users" are people who interact through a future web app (built separately), plus the operator who runs and maintains the service. Each story below is a standalone slice that can be developed, tested, and demonstrated on its own.
 
-### User Story 1 - Register and authenticate with personal Gurobi credentials (Priority: P1)
+### User Story 1 - Register and sign in securely (Priority: P1)
 
-A new user signs up for the service by providing a username/email, a password, and their own Gurobi Intelligence Hub credentials (Access ID and Secret). The system stores their account securely and lets them sign in afterward to obtain a session token that grants access to the chat capabilities.
+A new person creates an account by providing a username, a password, and their own Gurobi Intelligence Access ID and Secret. They can then sign in and receive a credential that authorizes every later request. Their Gurobi credentials are stored so that only the service can use them on their behalf, and are never visible to anyone — including operators reading the data store or logs.
 
-**Why this priority**: Without an account and an authenticated session bound to the user's own Gurobi credentials, no other capability can function. This is the foundational entry point and the minimum that delivers any value (a securely stored, retrievable account).
+**Why this priority**: No other capability is reachable without an identity and an authorization token, and the safe handling of each person's private Gurobi credentials is the central trust promise of the whole service. This is the smallest slice that delivers standalone, demonstrable value (a working, secure account system).
 
-**Independent Test**: Can be fully tested by registering a new account, signing in to receive a session token, and confirming that protected endpoints reject requests without a valid token and accept them with one — without ever needing to start a container.
+**Independent Test**: Register a new account, confirm sign-in returns a valid authorization token, confirm the same token is accepted by a protected endpoint, and confirm the stored Gurobi credentials are unreadable in the data store and absent from logs.
 
 **Acceptance Scenarios**:
 
-1. **Given** no existing account for an email, **When** the user submits valid signup details including Gurobi Access ID and Secret, **Then** the account is created, the password is stored in a non-reversible form, the Gurobi Secret is stored in encrypted form, and the user receives a success confirmation.
-2. **Given** an existing account, **When** the user signs in with correct credentials, **Then** they receive a time-limited session token.
-3. **Given** an existing account, **When** the user signs in with an incorrect password, **Then** access is denied and no token is issued.
-4. **Given** a signup attempt with an email that is already registered, **When** the user submits, **Then** the request is rejected with a clear "already registered" message.
-5. **Given** a protected endpoint, **When** a request arrives without a valid session token, **Then** the request is rejected as unauthorized.
+1. **Given** no existing account for a username, **When** the person registers with a username, password, and Gurobi Access ID + Secret, **Then** the account is created and the password and Gurobi Secret are stored in non-readable form.
+2. **Given** a registered account, **When** the person signs in with the correct username and password, **Then** they receive a time-limited authorization token.
+3. **Given** a registered account, **When** the person signs in with an incorrect password, **Then** access is refused and no token is issued.
+4. **Given** a username that is already registered, **When** another registration uses the same username, **Then** the request is rejected.
+5. **Given** any protected endpoint, **When** a request arrives without a valid authorization token, **Then** the request is refused.
 
 ---
 
-### User Story 2 - Chat with the Gurobi agents over a multi-turn conversation (Priority: P2)
+### User Story 2 - Hold a continuous conversation with the optimization assistant (Priority: P1)
 
-An authenticated user starts a conversation and sends a message directed at one of the three Gurobi agents (Gurobot, Explainer, or Modeler). On the first message of a conversation the system provisions the user's own isolated environment connected to their Gurobi credentials, keeps that environment alive across turns, and returns the agent's reply. The user continues the conversation across multiple messages and receives context-aware responses.
+A signed-in person starts a chat thread and chooses one agent for it (`gurobot`, `explainer`, or `modeler`); that choice is fixed for the life of the thread. The explainer and modeler are multi-turn: they may ask clarifying questions and expect the person's next message to continue the same thread. The person sends follow-up messages on the same thread — reusing the same agent — and the agent responds with full awareness of the earlier exchange. The person may request either a plain text reply or a structured-output reply, and responses can include files produced by the agent.
 
-**Why this priority**: This is the core product value — letting users actually use the Gurobi agents. It depends on US1 (authentication) but, once authenticated, delivers the central experience.
+**Why this priority**: This is the core value of the product — letting each person use the Gurobi optimization assistants conversationally with their own quota. A single, non-continuous request would break the explainer and modeler, so conversation continuity is essential rather than optional.
 
-**Independent Test**: Can be tested by authenticating, opening a conversation against one agent, sending two or more sequential messages, and confirming each returns a coherent reply and that the conversation stays bound to the same agent throughout.
+**Independent Test**: From an authenticated session, start a thread bound to one agent, send a message that triggers a clarifying question, send a follow-up on the same thread with the same agent, and confirm the agent's reply reflects the earlier turn rather than starting over; also confirm a follow-up naming a different agent is rejected, and that a structured-output request returns a structured payload.
 
 **Acceptance Scenarios**:
 
-1. **Given** an authenticated user with no active environment, **When** they send their first message in a new conversation to a chosen agent, **Then** the system provisions their isolated environment on demand and returns the agent's reply.
-2. **Given** an active conversation bound to one agent, **When** the user sends a follow-up message, **Then** the reply reflects the prior turns of the same conversation (context is retained).
-3. **Given** a conversation already bound to one agent, **When** the user attempts to direct a message in that same conversation to a different agent, **Then** the system enforces the original binding and rejects or prevents the agent switch.
-4. **Given** an authenticated user, **When** they request a structured-output response for a message, **Then** the reply is returned in the requested structured form in addition to or instead of free-form text.
-5. **Given** two different authenticated users chatting at the same time, **When** each sends messages, **Then** each user's messages are served only by their own isolated environment and credentials, with no cross-user data exposure.
+1. **Given** an authenticated person with a new chat thread, **When** they send a first message naming one of the three agents in the `agent` field, **Then** that agent is bound to the thread and they receive that agent's response.
+2. **Given** an active thread where the agent asked a clarifying question, **When** the person sends a follow-up message on the same thread with the same `agent`, **Then** the agent continues the same context instead of restarting.
+3. **Given** a request that asks for structured output (optionally with a schema), **When** the agent responds, **Then** the agent's native structured payload is forwarded back to the caller unmodified, in addition to (or instead of) free-form text.
+4. **Given** a request that includes input files, **When** the agent produces output files, **Then** the response returns those output files to the caller.
+5. **Given** two different chat threads owned by the same person, **When** messages are sent to each, **Then** each thread maintains its own independent context and its own bound agent.
+6. **Given** a person explicitly ends a conversation, **When** they later start a new thread, **Then** the new thread begins with fresh context and may bind any agent.
+7. **Given** a chat request whose `agent` value is missing or not one of the three supported agents, **When** it is received, **Then** it is rejected with a validation error before any agent is contacted.
+8. **Given** a thread already bound to one agent, **When** a follow-up request for that same conversation specifies a different agent, **Then** it is rejected with a validation error and the bound agent is unchanged.
 
 ---
 
-### User Story 3 - Transparent recovery after idle shutdown (Priority: P3)
+### User Story 3 - Isolation and automatic resource reclamation (Priority: P2)
 
-A user returns to a conversation after a period of inactivity during which their environment was automatically stopped to free resources. The user sends their next message and receives a normal reply without having to manually restart anything; the response indicates that recovery occurred.
+Each person's optimization workload runs in an isolated environment tied to their own Gurobi credentials and quota, separate from every other person. When a person stops interacting, their environment is automatically shut down after a configurable idle period so that resources are freed and their Gurobi quota is not held "live" while unused. Activity resets the idle timer.
 
-**Why this priority**: Improves reliability and user experience and is essential for sustainable resource use on a constrained host, but the product is usable for demos without it. It builds on US2.
+**Why this priority**: Isolation protects each person's credentials, data, and quota from every other person, and automatic reclamation keeps the shared machine and per-person quotas from being consumed by idle sessions. It is essential for safe multi-user operation but builds on Stories 1 and 2.
 
-**Independent Test**: Can be tested by starting a conversation, forcing or waiting for the idle shutdown of the environment, then sending another message in the same conversation and confirming the reply succeeds and is flagged as recovered.
+**Independent Test**: Drive activity for one account, confirm a dedicated isolated environment is running for it; leave it idle beyond the configured threshold, confirm the environment is shut down; confirm a second account's environment and data are never reachable from the first.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user environment that has been idle beyond the configured timeout, **When** the background reaper runs, **Then** the idle environment is stopped and its resources are released.
-2. **Given** a conversation whose environment was stopped while idle, **When** the user sends a new message, **Then** the system transparently re-provisions the environment, retries the message, returns a normal reply, and marks the response as recovered.
-3. **Given** an environment that is actively in use, **When** the reaper runs, **Then** the active environment is not stopped.
+1. **Given** an authenticated person sends their first message, **When** no environment is currently running for them, **Then** a dedicated environment is started using only that person's own Gurobi credentials.
+2. **Given** a person with a running environment, **When** any interaction occurs, **Then** their "last used" time is updated.
+3. **Given** a person whose environment has been idle beyond the configured threshold, **When** the reclamation check runs, **Then** their environment is stopped and its allocated resources (including its loopback port) are released for reuse.
+4. **Given** two different people are both active, **When** each interacts, **Then** neither can observe the other's conversations, files, credentials, or quota.
+
+---
+
+### User Story 4 - Graceful recovery after reclamation (Priority: P3)
+
+A person returns to a chat thread after their environment was automatically shut down for being idle. Their next message transparently brings a fresh environment back up and continues the thread. The previously in-progress multi-turn state is lost, but the person experiences automatic recovery — flagged as such in the response — rather than an error.
+
+**Why this priority**: This hardens the idle-reclamation design (Story 3) so that the inevitable case of "user returns after timeout" degrades gracefully. It is valuable polish but not required for a first demonstrable system.
+
+**Independent Test**: Start a thread, force the environment to be reclaimed, send another message on the same thread, and confirm the system recovers automatically and returns a valid response (marked as recovered) instead of failing.
+
+**Acceptance Scenarios**:
+
+1. **Given** a thread whose underlying environment was reclaimed while the thread was still considered active, **When** the next message arrives for that thread, **Then** the system detects the stale state, brings the environment back up, retries the message, and returns a valid response.
+2. **Given** such a recovery occurs, **When** the response is returned, **Then** it carries a recovery indicator (recovered = true) and the caller is not shown an internal error, even though earlier multi-turn context for that thread is no longer available.
 
 ---
 
 ### Edge Cases
 
-- What happens when a user signs up with Gurobi credentials that are invalid or expired? The system should surface an authentication/licensing failure from the agent backend rather than hanging, and should not leave a broken environment running.
-- What happens when the host has no free port in the allocated range (all concurrent slots in use)? New environment provisioning must fail gracefully with a clear "capacity reached, try again later" message rather than crashing.
-- What happens when the host runs out of memory/CPU while provisioning a new environment? Provisioning must fail safely and report a transient error.
-- What happens when a user sends a message to a conversation ID that does not belong to them? The request must be rejected as unauthorized.
-- What happens when provisioning succeeds but the agent backend never becomes ready within a reasonable startup window? The request times out with a clear error and the half-started environment is cleaned up.
-- What happens when the session token has expired mid-conversation? The user is required to re-authenticate; the conversation can resume afterward.
-- What happens if the reaper stops an environment at the exact moment a message is being processed? The in-flight request either completes or fails cleanly, and the next message recovers.
+- **Resource pool exhaustion**: When every allocatable slot/port for per-user environments is already in use and another person becomes active, provisioning fails gracefully with a clear "capacity reached, try again later" response rather than crashing.
+- **Concurrent messages on one environment**: An environment is expected to handle one active conversation at a time; simultaneous requests for the same person/environment are serialized or rejected per the documented v1 limitation.
+- **Service restart**: Conversation continuity is held only for the lifetime of the running service; after a restart, active threads lose their in-progress context, and the next message must recover gracefully (as in Story 4).
+- **Invalid Gurobi credentials**: When a person's stored Gurobi credentials are rejected by the upstream Gurobi service as their environment starts, the person receives a clear failure response and no partial/abandoned resources are left allocated.
+- **Expired or tampered authorization token**: A request with an expired or invalid token is refused without revealing which factor failed in a way that aids an attacker.
+- **Environment fails to start**: If a person's environment cannot be started (resource limits, startup timeout), the person receives a clear failure response and any half-started resources are cleaned up.
+- **Unknown or missing agent**: A chat request whose `agent` value is missing or not one of the three supported agents is rejected with a validation error before any agent is contacted.
+- **Agent change mid-conversation**: A follow-up request for an existing conversation that names a different agent than the one already bound is rejected with a validation error; the originally bound agent is preserved.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-#### Authentication & Account Management
+**Authentication & credential safety**
 
-- **FR-001**: System MUST allow a new user to register an account with a unique identifier (email/username), a password, and their personal Gurobi Intelligence Hub credentials (Access ID and Secret).
-- **FR-002**: System MUST store user passwords in a non-reversible (hashed) form and MUST NOT store them in plaintext.
-- **FR-003**: System MUST store each user's Gurobi Secret in encrypted form at rest and decrypt it only when needed to provision that user's environment.
-- **FR-004**: System MUST reject signup when the chosen identifier is already registered, with a clear message.
-- **FR-005**: System MUST allow a registered user to sign in with their credentials and, on success, issue a time-limited session token.
-- **FR-006**: System MUST deny sign-in for incorrect credentials without revealing whether the identifier or the password was wrong.
-- **FR-007**: System MUST protect all chat and conversation endpoints so they are accessible only with a valid, unexpired session token.
-- **FR-008**: System MUST reject any request bearing an invalid, malformed, or expired session token as unauthorized.
+- **FR-001**: System MUST allow a new person to register with a username, a password, and their own Gurobi Intelligence Access ID and Secret.
+- **FR-002**: System MUST reject registration when the chosen username already exists.
+- **FR-003**: System MUST store passwords only in a non-reversible (one-way hashed) form and MUST never store or return them in readable form.
+- **FR-004**: System MUST store each person's Gurobi Access ID and Secret encrypted at rest, decryptable only by the service using a key held server-side, and MUST never store or expose them in readable form.
+- **FR-005**: System MUST never write Gurobi credentials, passwords, or authorization tokens to logs.
+- **FR-006**: System MUST issue a time-limited authorization token upon successful sign-in and refuse sign-in for invalid credentials, without revealing whether the username or the password was wrong.
+- **FR-007**: System MUST require a valid authorization token on every endpoint other than registration and sign-in, and MUST refuse requests lacking one.
 
-#### Chat & Conversations
+**Conversational chat proxy**
 
-- **FR-009**: System MUST let an authenticated user start a conversation directed at exactly one of the three available agents: Gurobot, Explainer, or Modeler.
-- **FR-010**: System MUST provision the user's isolated environment on demand when the first message of a conversation is sent, and reuse the same environment for subsequent messages.
-- **FR-011**: System MUST keep a user's agent session alive across multiple conversation turns so that conversational context is preserved.
-- **FR-012**: System MUST enforce, for the lifetime of a conversation, that all messages are handled by the agent the conversation was originally bound to, and MUST prevent switching agents within a conversation.
-- **FR-013**: System MUST support a basic chat option that returns the agent's free-form text reply.
-- **FR-014**: System MUST support a structured-output option that returns the agent's reply in a caller-requested structured form.
-- **FR-015**: System MUST associate every conversation with the owning user and reject access to a conversation by any other user.
-- **FR-016**: System MUST return a clear, user-facing error when the agent backend reports an authentication, licensing, or processing failure.
+- **FR-008**: System MUST require every chat request to carry an `agent` field naming exactly one of three supported agents — `gurobot`, `explainer`, and `modeler` — and MUST return that agent's response.
+- **FR-009**: System MUST accept a caller-supplied conversation identifier on every chat request that groups messages into a single continuing thread.
+- **FR-010**: System MUST bind the chosen agent to a conversation the first time it sees that conversation identifier, and MUST store the bound agent alongside that thread's session for the thread's lifetime.
+- **FR-011**: System MUST reject, with a validation error and before contacting any agent, a chat request whose `agent` value is missing or not one of the three supported agents.
+- **FR-012**: System MUST reject, with a validation error, a follow-up chat request for an existing conversation whose `agent` value differs from the agent already bound to that thread, leaving the bound agent unchanged.
+- **FR-013**: System MUST continue an existing thread's context when a follow-up message arrives for a conversation that already has active context, rather than starting a new exchange.
+- **FR-014**: System MUST begin a fresh context the first time it sees a given conversation identifier for a person.
+- **FR-015**: System MUST keep the context of distinct conversation threads independent from one another, including multiple threads owned by the same person.
+- **FR-016**: System MUST support both a plain text reply and a structured-output reply, selectable per chat request via a flag (with an optional caller-supplied schema). When structured output is requested, the System MUST forward the request to the agent's native structured-output capability and return the structured payload the agent emits unmodified, without inventing, validating, or coercing schemas of its own.
+- **FR-017**: System MUST accept optional input files with a chat message and MUST return any files produced by the agent in the response.
+- **FR-018**: System MUST allow a person to explicitly end a conversation, releasing its retained context.
 
-#### Isolation & Resource Management
+**Per-user isolation & resource lifecycle**
 
-- **FR-017**: System MUST run at most one active environment per user at any time.
-- **FR-018**: System MUST expose each user environment only on the local host (loopback), never on a publicly reachable interface, allocating from the reserved port range 61100–61200.
-- **FR-019**: System MUST give each user a separate file workspace that is not shared with or visible to other users' environments.
-- **FR-020**: System MUST fail provisioning gracefully and return a clear capacity message when no environment slot/port is available.
-- **FR-021**: System MUST track the last-activity time of each user environment.
+- **FR-019**: System MUST run each person's optimization workload in an environment dedicated to that person and started with only that person's own decrypted Gurobi credentials.
+- **FR-020**: System MUST ensure a person's environment is running before their message is processed, starting one on demand if none is running.
+- **FR-021**: System MUST allocate each environment a slot from a fixed, bounded pool of loopback-only ports in the reserved range 61100–61200, and MUST release that slot when the environment stops, making it available for reuse.
+- **FR-022**: System MUST give each person a separate file workspace that is not shared with or visible to any other person's environment.
+- **FR-023**: System MUST record the time of each person's most recent interaction.
+- **FR-024**: System MUST automatically stop environments that have been idle longer than a configurable threshold, and MUST release their resources.
+- **FR-025**: System MUST ensure that one person can never access another person's conversations, files, credentials, or Gurobi quota.
+- **FR-026**: System MUST tie a thread's retained context to the lifetime of its environment, so that context is released when its environment is stopped.
 
-#### Idle Reaping & Recovery
+**Resilience**
 
-- **FR-022**: System MUST run a background process that stops any user environment that has been idle longer than a configurable timeout (default 15 minutes).
-- **FR-023**: System MUST NOT stop an environment that is actively serving a request or within the idle threshold.
-- **FR-024**: System MUST, when a message arrives for a conversation whose environment was stopped, transparently re-provision the environment, retry the message, and return a normal reply.
-- **FR-025**: System MUST indicate in the response when a transparent recovery occurred (a recovered=true flag).
-- **FR-026**: System MUST release all resources (port, workspace handles, compute) belonging to a stopped environment so they can be reused.
+- **FR-027**: When a message arrives for a thread whose environment was stopped while the thread was still considered active, the System MUST detect the stale state, restart the environment, establish fresh context, retry the message, and return a valid response instead of an error — accepting the loss of prior in-progress context.
+- **FR-028**: System MUST indicate in the response when a transparent recovery occurred (recovered = true).
+- **FR-029**: System MUST treat one environment as handling a single active conversation at a time, either by serializing concurrent requests to the same environment or by limiting an environment to one active conversation as a documented v1 limitation.
+- **FR-030**: System MUST recover gracefully on the first message after a service restart, even though in-progress thread context held only for the running service's lifetime is lost.
+- **FR-031**: System MUST return a clear, non-internal error to the caller when a person's environment cannot be started or their Gurobi credentials are rejected upstream, without leaving partial resources allocated.
 
-#### Configuration & Deployment
+**Exposure & access boundary**
 
-- **FR-027**: System MUST allow the idle timeout to be configured via an operational setting without code changes.
-- **FR-028**: System MUST be deployable as a managed long-running service that starts automatically and restarts on failure.
-- **FR-029**: System MUST be reachable by users through a reverse proxy that terminates external access, while the per-user environments remain bound to loopback only.
+- **FR-032**: System MUST expose only a single secure (HTTPS) entry point to the outside world; the application service and all per-user environments MUST NOT be reachable from outside the host.
+- **FR-033**: The application service and every per-user environment MUST listen only on the host's loopback interface; external access is mediated solely by the reverse proxy.
+- **FR-034**: The future web app MUST be able to operate using only the registration, sign-in, and chat capabilities, without any direct access to environments, internal ports, or Gurobi credentials.
+
+**Configuration & deployment**
+
+- **FR-035**: System MUST allow the idle timeout to be configured via an operational setting (default 15 minutes) without code changes.
+- **FR-036**: System MUST be deployable as a managed long-running service that starts automatically and restarts on failure.
 
 ### Key Entities *(include if feature involves data)*
 
-- **User Account**: Represents a registered person. Key attributes: unique identifier (email/username), hashed password, encrypted Gurobi Access ID/Secret, creation time. Owns conversations and at most one active environment.
-- **Session Token**: A time-limited proof of authentication issued at sign-in and presented on protected requests. Bound to one user, has an expiry.
-- **Conversation**: A multi-turn exchange owned by one user and permanently bound to one agent (Gurobot, Explainer, or Modeler). Holds ordered turns and the context carried across them.
-- **User Environment**: The user's isolated, on-demand runtime connected to their Gurobi credentials. Key attributes: owning user, loopback port from the reserved range, dedicated file workspace, current state (running/stopped), last-activity timestamp.
-- **Message Turn**: A single user message and its agent reply within a conversation, optionally including a structured-output payload and a recovered indicator.
-- **Agent**: One of the three fixed Gurobi capabilities — Gurobot, Explainer, Modeler — that a conversation can be bound to.
+- **User account**: Represents a registered person. Attributes: unique identifier, username, non-reversible password representation, Gurobi Access ID, encrypted Gurobi Secret, currently allocated resource slot/port (if any), name of their dedicated environment (if any), and time of last interaction.
+- **Authorization token**: A time-limited credential issued at sign-in that identifies the person on every subsequent request.
+- **Conversation thread**: A continuing exchange identified by a caller-supplied identifier, owned by one person, bound to exactly one agent (`gurobot` | `explainer` | `modeler`) chosen at creation and fixed thereafter, and carrying its own context for the duration of its environment's life.
+- **Agent**: One of three supported workflows — `gurobot`, `explainer`, `modeler` — each tracking its own distinct state on the Gurobi side; selected per conversation thread and not interchangeable mid-thread.
+- **User environment**: A per-person isolated runtime that holds that person's Gurobi credentials and serves their optimization requests; created on demand, reclaimed when idle, and occupying one loopback port slot from the bounded 61100–61200 pool, with its own dedicated file workspace.
+- **Message turn**: A single person message and its agent reply within a conversation, optionally carrying input/output files, a structured-output payload, and a recovery indicator.
+- **Active-session registry**: The service's record of which conversation threads currently have live context, which agent each thread is bound to, and which environment each is bound to.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A new user can go from starting signup to receiving their first agent reply in under 5 minutes on first use.
-- **SC-002**: Returning users receive an agent reply to a follow-up message in an already-warm conversation within 10 seconds for typical requests.
-- **SC-003**: 100% of stored passwords and Gurobi Secrets are unreadable in plaintext if the underlying data store is inspected directly.
-- **SC-004**: No user can ever read, reach, or be served by another user's environment, conversation, or workspace (0 cross-user data exposure incidents in testing).
-- **SC-005**: At least the documented number of concurrent users (bounded by the 101-port range and host capacity) can each hold an independent active conversation without interference.
-- **SC-006**: 95% of messages sent to a conversation whose environment was idle-stopped succeed transparently on the next attempt and are correctly flagged as recovered.
-- **SC-007**: Environments idle beyond the configured timeout are stopped within one reaper cycle, and their resources become available for reuse.
-- **SC-008**: An attempt to switch agents mid-conversation is blocked 100% of the time.
-- **SC-009**: The service automatically restarts and resumes accepting authenticated requests after an unexpected process termination, with no manual intervention.
+- **SC-001**: A new person can go from registration to receiving their first assistant response in a single sitting (under 5 minutes on first use) without manual operator involvement.
+- **SC-002**: A follow-up message within an active conversation receives a response that demonstrably reflects the prior turn in at least 99% of cases where the environment is still live.
+- **SC-003**: When a returning person sends a message after their environment was reclaimed, the system recovers automatically and returns a valid response flagged as recovered in 100% of cases, with zero internal-error responses surfaced to the caller.
+- **SC-004**: Idle environments are stopped within one reclamation cycle of the configured idle threshold (default 15 minutes) in 100% of cases, so no person's Gurobi quota is held live while they are inactive.
+- **SC-005**: No person can ever read, reuse, or affect another person's conversations, files, credentials, or quota — verified to hold in 100% of isolation tests.
+- **SC-006**: Stored Gurobi secrets and passwords are unreadable in the data store and never appear in any log line — verified across a full inspection of stored data and logs.
+- **SC-007**: Only the single secure external entry point is reachable from outside the host; every attempt to reach the application service or a per-user environment directly from outside fails in 100% of probes.
+- **SC-008**: The number of simultaneously running per-user environments never exceeds the bounded pool size (101 ports, 61100–61200), and freed slots become reusable for new active users.
+- **SC-009**: An agent switch attempt mid-conversation is blocked 100% of the time, with the originally bound agent preserved.
+- **SC-010**: The service automatically restarts and resumes accepting authenticated requests after an unexpected process termination, with no manual intervention.
 
 ## Assumptions
 
-- The three agents (Gurobot, Explainer, Modeler) are provided by the user's own Gurobi Intelligence Hub account via their personal credentials; the system proxies to them and does not implement the agents itself.
-- Each user supplies valid Gurobi Intelligence credentials at signup; validating those credentials is the responsibility of the Gurobi backend, and the system surfaces any failure rather than pre-validating.
-- The deployment target is a single host (the described Azure VM, 2 vCPU / 8 GB RAM) for the development environment; concurrency limits are bounded by host resources and the 101-port range (61100–61200).
-- "One container per user" maps to "one isolated environment per user"; the spec treats it as an isolation boundary rather than mandating a specific runtime technology.
-- Session tokens use a standard, industry-typical expiry (e.g., on the order of hours) configurable by operators; the exact value is an operational detail.
-- Conversation and message history retention follows standard practice for the development environment; long-term archival/export is out of scope for this version.
-- External transport security (TLS) is handled at the reverse-proxy layer; per-user environments are never exposed beyond loopback.
-- Administrative concerns (billing, quotas beyond capacity limits, multi-host scaling, account recovery/password reset) are out of scope for this version.
-- Password-reset, email verification, and account deletion flows are out of scope for this version unless added later.
+- **Single-host deployment**: The service runs on the existing single Azure VM described in the brief (Ubuntu Server 24.04 LTS, 2 vCPUs / 8 GB RAM); horizontal scaling across multiple hosts is out of scope for v1.
+- **Container-based environments**: Each per-user environment is realized as one container per active user from the provided `gurobi/mcp` image, named per user, drawn from the fixed loopback port pool 61100–61200. The application talks to containers via the platform's container management interface rather than ad-hoc shell calls.
+- **Technology direction from the brief**: The service is implemented as a single backend JSON API; passwords use bcrypt hashing, Gurobi secrets use symmetric encryption at rest (e.g., Fernet), authorization uses JWTs, and persistence starts on SQLite. These are accepted defaults from the brief and will be confirmed during planning.
+- **In-memory session registry for v1**: Live conversation context is held in process memory only; it is intentionally lost on service restart, documented as a known v1 limitation, with graceful recovery on the next message.
+- **Open self-service registration**: Anyone who can reach the service may register; invite-only or operator-approved onboarding is out of scope for v1.
+- **Token policy**: Authorization tokens are time-limited; token refresh/rotation is out of scope for v1 and a person re-signs in when a token expires.
+- **One active conversation per environment for v1**: Where serialization is not in place, an environment serves one active conversation at a time; additional simultaneous conversations per person are a documented v1 limitation.
+- **Edge/TLS termination is external to the application**: A reverse proxy (Caddy) in front of the service terminates HTTPS and is the only externally exposed port; the application itself listens only on the local host interface, and the service is run under a managed unit (systemd).
+- **File transport**: Input and output files accompanying chat messages are exchanged through the JSON API; the precise encoding (inline-encoded content vs. references) will be settled during planning and does not change the externally observable behavior described here.
+- **The web app is out of scope**: Only the backend is built here; the chat UI is a separate, later project that consumes registration, sign-in, and chat.
+- **Credential validation is upstream**: Gurobi credentials are validated by the Gurobi backend when an environment starts; the service surfaces any failure rather than pre-validating at registration.
