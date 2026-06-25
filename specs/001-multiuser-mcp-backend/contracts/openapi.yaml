@@ -1,0 +1,177 @@
+openapi: 3.1.0
+info:
+  title: Gurobi MCP Multi-User Backend
+  version: 0.1.0
+  description: >
+    Headless JSON backend. Users register with their own Gurobi Intelligence
+    credentials, sign in for a JWT, and chat multi-turn with one of three agents
+    (gurobot, explainer, modeler), each conversation bound to a single agent.
+    Per-user gurobi/mcp containers are started on demand, reaped when idle, and
+    transparently recovered. This contract is the external surface; the backend
+    speaks MCP to the containers, not to these callers.
+
+servers:
+  - url: https://{host}
+    variables:
+      host: { default: example.com }
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Account created, content: { application/json: { schema: { $ref: '#/components/schemas/UserPublic' } } } }
+        '400': { description: Invalid input, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Username already exists (FR-002), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /auth/login:
+    post:
+      summary: Sign in, receive a time-limited token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Authenticated, content: { application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } } } }
+        '401': { description: Invalid credentials — does not reveal which factor failed (FR-006), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /chat:
+    post:
+      summary: Send a message turn to the conversation's agent
+      description: >
+        First sight of conversation_id binds the agent (FR-010). A different agent
+        for an existing conversation is rejected (FR-012). Missing/invalid agent is
+        rejected before contacting any agent (FR-011). Starts/recovers the user's
+        environment as needed (FR-020, FR-027).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200': { description: Agent reply, content: { application/json: { schema: { $ref: '#/components/schemas/ChatResponse' } } } }
+        '400': { description: Missing/invalid agent or agent-switch attempt (FR-011/012), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Missing/expired token (FR-007) }
+        '403': { description: Conversation belongs to another user (FR-025) }
+        '424': { description: Environment failed to start or Gurobi credentials rejected upstream (FR-031), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: Capacity reached — no free port in 61100–61200 (SC-008), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /conversations/{conversation_id}/end:
+    post:
+      summary: Explicitly end a conversation, releasing retained context (FR-018)
+      parameters:
+        - in: path
+          name: conversation_id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Conversation ended }
+        '401': { description: Missing/expired token }
+        '403': { description: Conversation belongs to another user (FR-025) }
+        '404': { description: Unknown conversation }
+
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Health' } } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  security:
+    - bearerAuth: []
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, password, grb_access_id, grb_secret]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 8 }
+        grb_access_id: { type: string }
+        grb_secret: { type: string, description: Stored Fernet-encrypted; never returned (FR-004) }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, enum: [bearer] }
+        expires_in: { type: integer, description: Seconds until expiry }
+
+    UserPublic:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        created_at: { type: string, format: date-time }
+      description: Never includes password or Gurobi secret.
+
+    ChatRequest:
+      type: object
+      required: [conversation_id, agent, message]
+      properties:
+        conversation_id: { type: string, description: Caller-supplied thread id (FR-009) }
+        agent: { type: string, enum: [gurobot, explainer, modeler], description: Bound on first use, immutable (FR-010/012) }
+        message: { type: string }
+        structured: { type: boolean, default: false, description: Proxy-mode structured output (FR-016) }
+        schema:
+          type: object
+          additionalProperties: true
+          description: Optional schema forwarded to the agent's native structured-output capability; not validated by the backend.
+        input_files:
+          type: array
+          items: { $ref: '#/components/schemas/FileRef' }
+
+    ChatResponse:
+      type: object
+      required: [conversation_id, agent, recovered]
+      properties:
+        conversation_id: { type: string }
+        agent: { type: string, enum: [gurobot, explainer, modeler] }
+        text: { type: string, description: Free-form reply (present unless purely structured) }
+        structured:
+          type: object
+          additionalProperties: true
+          description: Agent's native structured payload, returned unmodified when requested (FR-016).
+        output_files:
+          type: array
+          items: { $ref: '#/components/schemas/FileRef' }
+        recovered: { type: boolean, description: true if the environment was transparently restarted for this turn (FR-028) }
+
+    FileRef:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        path: { type: string, description: Path within the user's /workspace }
+        content_base64: { type: string, description: Inline content for small files (optional) }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok] }
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+        code: { type: string }
