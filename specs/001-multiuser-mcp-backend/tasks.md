@@ -10,7 +10,7 @@ description: "Task list for Gurobi MCP Multi-User Backend implementation"
 
 **Tests**: Test tasks are INCLUDED — the project constitution mandates Test-First development
 (Principle III, NON-NEGOTIABLE) and contract testing (Principle IV). License-free unit/contract
-tests run by default; container/MCP/solver round-trips are marked `[integration]`.
+tests run by default; container/MCP round-trips are marked `[integration]`.
 
 **Organization**: Grouped by user story. US1 and US2 are both P1; US1 is the smallest standalone
 slice, US2 is the core product value. MVP = US1 + US2.
@@ -242,7 +242,7 @@ After Foundational: Developer A → US1, Developer B → US2; once US2 lands, US
 ## Notes
 
 - `[P]` = different files, no dependencies on incomplete tasks
-- `[integration]` tests require Docker + a Gurobi license and are excluded from the default `pytest` run
+- `[integration]` tests require Docker + Intelligence Hub credentials and are excluded from the default `pytest` run
 - Tests MUST fail before implementing (Principle III, NON-NEGOTIABLE)
 - Commit after each task or logical group, referencing the task ID
 - Secrets/passwords/tokens never logged or returned (FR-003/004/005) — verify in T007, T010, T044

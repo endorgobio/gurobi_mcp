@@ -16,7 +16,7 @@ A headless JSON backend that lets many users each register with their own Gurobi
 
 **Storage**: SQLite for durable user accounts (username, bcrypt hash, encrypted Gurobi credentials, last-activity, allocated port/container name). In-process memory for the live session/conversation registry (intentionally volatile per spec).
 
-**Testing**: `pytest` + `pytest-asyncio`. Unit tests (security, port pool, agent-binding, reaper logic) and REST contract tests run license-free; full container/MCP round-trips marked `[integration]` and require Docker + a Gurobi license.
+**Testing**: `pytest` + `pytest-asyncio`. Unit tests (security, port pool, agent-binding, reaper logic) and REST contract tests run license-free; full container/MCP round-trips marked `[integration]` and require Docker + valid Intelligence Hub credentials (Access ID/Secret).
 
 **Target Platform**: Linux server — Ubuntu Server 24.04 LTS on Azure (`Standard_B2as_v2`, 2 vCPU / 8 GB RAM), Docker 29.x, `gurobi/mcp` image present.
 
@@ -32,14 +32,14 @@ A headless JSON backend that lets many users each register with their own Gurobi
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-> **Scope note**: The constitution (v1.0.0) was authored for a Gurobi MCP **server that exposes solver tools**. This feature is a multi-user **backend/proxy** in front of the upstream `gurobi/mcp` containers — it is an MCP *client*, exposes a REST/JSON API (not MCP tools) to its own callers, and does not link `gurobipy`. Principles are applied in that adapted sense below. None of the adaptations are violations; they are scope clarifications.
+> **Scope note**: The project constitution (v2.0.0) was amended to match this architecture — a multi-user **backend/proxy** in front of the upstream `gurobi/mcp` containers. This service is an MCP *client*, exposes a REST/JSON API (not MCP tools) to its own callers, links no `gurobipy`, and runs no solver. Principles II and IV now address faithful proxying and REST contract testing directly, so the gates below are clean rather than adaptations.
 
 | Principle | Status | How this plan complies |
 |-----------|--------|------------------------|
 | **I. MCP Protocol Compliance** | PASS (adapted) | Backend talks to each container through a compliant `mcp` SDK `ClientSession` (initialize handshake → tool discovery → typed `call_tool`), never ad-hoc HTTP against the container. The REST surface it exposes to the web app is documented contract-first in `contracts/openapi.yaml`. |
-| **II. Optimization Correctness** | PASS (adapted) | Backend formulates no models; it MUST relay agent text, structured content, files, and any solver status/errors faithfully and never silently drop them (FR-016 proxy mode, FR-031 upstream errors surfaced). |
+| **II. Faithful Proxying & Result Integrity** | PASS | Backend builds/solves no models and links no `gurobipy`; it MUST relay agent text, structured content, files, and any agent responses or errors faithfully and never silently drop them (FR-016 proxy mode, FR-031 upstream errors surfaced). |
 | **III. Test-First (NON-NEGOTIABLE)** | PASS | Tasks will be ordered test-first: failing unit/contract tests before implementation. Security, port-pool, agent-binding, and reaper logic are unit-tested without a license. |
-| **IV. MCP Contract Testing** | PASS (adapted) | The external contract here is the REST API → license-free contract tests assert schemas, required fields, status codes, and error bodies. Container/MCP/solver round-trips are `[integration]` and excluded from the default run. |
+| **IV. Contract Testing** | PASS | The external contract here is the REST API → credential-free contract tests assert schemas, required fields, status codes, and error bodies. Container/MCP round-trips are `[integration]` and excluded from the default run. |
 | **V. Simplicity** | PASS | One FastAPI app, a handful of cohesive modules, no premature abstraction. Persistent MCP session + Docker lifecycle are intrinsic to the feature, not speculative. |
 
 **Gate result (pre-Phase 0)**: PASS — no violations; Complexity Tracking left empty.
@@ -91,7 +91,7 @@ src/
 
 tests/
 ├── contract/              # REST API contract tests (license-free)
-├── integration/           # full Docker + MCP round-trips ([integration], needs license)
+├── integration/           # full Docker + MCP round-trips ([integration], needs Hub credentials)
 └── unit/                  # security, port_pool, registry/binding, reaper logic
 
 deploy/
@@ -99,7 +99,7 @@ deploy/
 └── Caddyfile              # HTTPS reverse proxy → 127.0.0.1:8000
 ```
 
-**Structure Decision**: Single-project backend web service. One installable package `gurobimcp` with cohesive modules grouped by concern (auth, containers, chat) plus a standalone reaper. Tests split into `unit/`, `contract/` (both license-free, default CI) and `integration/` (Docker + Gurobi license, opt-in) per Principle IV. `deploy/` holds the systemd unit and Caddyfile called out in the spec.
+**Structure Decision**: Single-project backend web service. One installable package `gurobimcp` with cohesive modules grouped by concern (auth, containers, chat) plus a standalone reaper. Tests split into `unit/`, `contract/` (both license-free, default CI) and `integration/` (Docker + Intelligence Hub credentials, opt-in) per Principle IV. `deploy/` holds the systemd unit and Caddyfile called out in the spec.
 
 ## Complexity Tracking
 

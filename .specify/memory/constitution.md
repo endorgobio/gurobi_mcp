@@ -1,27 +1,29 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (unversioned) → 1.0.0
-Bump rationale: MAJOR — initial constitution creation, no prior version.
+Version change: 1.0.0 → 2.0.0
+Bump rationale: MAJOR — Principles II and IV redefined and the solver removed
+from the Technology Stack to match the actual architecture: this project is a
+multi-user backend/proxy to the gurobi/mcp Intelligence Hub containers, not a
+solver-exposing MCP server. It links no `gurobipy` and runs no solver.
 
-Modified principles: N/A (all new)
+Modified principles:
+  - II. "Optimization Correctness" → "Faithful Proxying & Result Integrity"
+  - IV. "MCP Contract Testing" → "Contract Testing" (REST contract + [integration])
 
-Added sections:
-  - Core Principles (5 principles)
-  - Technology Stack
-  - Development Workflow
-  - Governance
+Modified sections:
+  - Technology Stack — removed Solver/`gurobipy`; license → Hub credentials
+  - Development Workflow — Gurobi license → Intelligence Hub credentials
 
-Removed sections: N/A (initial draft)
+Known remaining solver-flavored wording (intentionally left for a future pass):
+  - Principle III still references "model-building logic" / "full solve
+    round-trips"; revisit if III is amended.
 
 Templates requiring updates:
-  - .specify/templates/plan-template.md ✅ No changes required — generic
-  - .specify/templates/spec-template.md ✅ No changes required — generic
-  - .specify/templates/tasks-template.md ✅ No changes required — generic
-  - .specify/templates/checklist-template.md ✅ No changes required — generic
+  - .specify/templates/*.md ✅ No changes required — generic
 
 Follow-up TODOs:
-  - None — all fields resolved from project context.
+  - Consider realigning Principle III wording with the proxy architecture.
 -->
 
 # Gurobi MCP Constitution
@@ -41,18 +43,20 @@ tool-listing.
 definitions to generate correct invocations. Deviations silently corrupt model
 reasoning and are nearly impossible to debug.
 
-### II. Optimization Correctness
+### II. Faithful Proxying & Result Integrity
 
-Gurobi model formulations exposed through MCP tools MUST produce
-mathematically valid results. Solver parameters, objective sense, constraint
-types, and variable bounds MUST be explicitly defined and documented in the
-tool schema. Tools MUST NOT silently ignore infeasibility or unboundedness —
-solver status (OPTIMAL, INFEASIBLE, UNBOUNDED, etc.) MUST always be
-communicated in structured output.
+This project is a backend/proxy: it does NOT build, run, or solve optimization
+models and links no `gurobipy`. It MUST relay the Intelligence Hub agents'
+outputs — text, structured content, files, status, and errors — faithfully and
+without alteration, and MUST NOT silently drop or reinterpret them. Upstream
+failures (authentication, agent, or processing errors) MUST always be surfaced
+to the caller rather than swallowed. The Hub agents may help build and code
+optimization models, but this service never executes them.
 
-**Rationale**: Incorrect optimization results propagate into agent decisions
-without triggering visible errors. The contract between tool and caller must
-be precise about what "success" and "failure" mean for each solver call.
+**Rationale**: As a proxy, the service's correctness is measured by fidelity,
+not by solver outcomes it never computes. Silently altering or dropping an
+agent's response corrupts the caller's reasoning exactly as a wrong solver
+result would, so faithful relay is the core contract.
 
 ### III. Test-First Development (NON-NEGOTIABLE)
 
@@ -66,18 +70,19 @@ round-trips via the MCP interface.
 (numerical instability, silent constraint violations, degenerate solutions).
 Catching these requires tests that run before the implementation exists.
 
-### IV. MCP Contract Testing
+### IV. Contract Testing
 
-Every MCP tool MUST have a contract test verifying its JSON schema, required
-fields, and error responses before implementation. Contract tests MUST be
-independent of any specific Gurobi license or environment — they test the
-MCP interface contract, not the solver outcome. Integration tests MAY
-require a Gurobi license and are marked `[integration]` to allow selective
-execution.
+The service's external contract — its REST/JSON API — MUST have contract tests
+verifying request/response schemas, required fields, status codes, and error
+bodies before implementation. Contract tests MUST be independent of any
+Intelligence Hub credentials, network access, or running container — they test
+the API surface, not live agent behavior. Tests that exercise real containers
+and the Hub agents over the MCP client session MAY require Hub credentials and
+are marked `[integration]` to allow selective execution.
 
-**Rationale**: Separating contract tests from solver tests allows CI to
-validate the API surface on any machine, while solver-dependent tests run
-only where a Gurobi license is available.
+**Rationale**: Separating contract tests from credential/network-dependent
+tests lets CI validate the API surface on any machine, while integration tests
+run only where Hub access is available.
 
 ### V. Simplicity
 
@@ -94,13 +99,17 @@ maintenance surface with no corresponding benefit.
 ## Technology Stack
 
 - **Runtime**: Python 3.11+
-- **MCP SDK**: `mcp` (Anthropic MCP Python SDK)
-- **Solver**: Gurobi (via `gurobipy`)
-- **Testing**: `pytest` with `pytest-asyncio` for async MCP handlers
+- **MCP SDK**: `mcp` (Anthropic MCP Python SDK) — used as a **client** to the
+  upstream `gurobi/mcp` containers; this project exposes no MCP tools of its own
+- **Solver**: none. This service does NOT link `gurobipy` and never runs a
+  solver. The Intelligence Hub agents (gurobot, explainer, modeler) may help
+  build and code models, but the service does not execute them
+- **Testing**: `pytest` with `pytest-asyncio` for async handlers
 - **Linting**: `ruff` for formatting and static analysis
 - **Type checking**: `mypy` (strict mode)
-- **License requirement**: Gurobi license required for integration tests;
-  contract and unit tests MUST run license-free
+- **Credential requirement**: valid Intelligence Hub credentials (Access ID/
+  Secret) required only for `[integration]` tests; contract and unit tests MUST
+  run without any Hub access
 
 ## Development Workflow
 
@@ -111,9 +120,9 @@ maintenance surface with no corresponding benefit.
   compliance with all five principles.
 - Complexity Tracking table MUST be filled for any deviation from Principle V
   (Simplicity), documenting why the simpler alternative was rejected.
-- Integration tests requiring a Gurobi license are marked `[integration]`
-  and excluded from the default `pytest` run; they MUST pass in a
-  license-enabled environment before merge.
+- Integration tests requiring Intelligence Hub credentials are marked
+  `[integration]` and excluded from the default `pytest` run; they MUST pass in
+  a credential-enabled environment before merge.
 - Commits MUST be atomic: one logical change per commit, with a descriptive
   message referencing the task ID (e.g., `feat(T012): implement solve tool`).
 
@@ -137,4 +146,4 @@ All PRs and code reviews MUST verify compliance with the five Core Principles.
 Non-compliance blocks merge unless formally justified in the Complexity
 Tracking table and approved by the project owner.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-06-25
+**Version**: 2.0.0 | **Ratified**: 2026-06-25 | **Last Amended**: 2026-06-25

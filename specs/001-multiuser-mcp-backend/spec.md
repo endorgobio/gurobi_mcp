@@ -197,3 +197,9 @@ A person returns to a chat thread after their environment was automatically shut
 - **File transport**: Input and output files accompanying chat messages are exchanged through the JSON API; the precise encoding (inline-encoded content vs. references) will be settled during planning and does not change the externally observable behavior described here.
 - **The web app is out of scope**: Only the backend is built here; the chat UI is a separate, later project that consumes registration, sign-in, and chat.
 - **Credential validation is upstream**: Gurobi credentials are validated by the Gurobi backend when an environment starts; the service surfaces any failure rather than pre-validating at registration.
+
+## Out of Scope
+
+- **No solver, no model execution**: This backend does not link or use `gurobipy` and never runs the Gurobi solver. It neither builds nor solves optimization models itself. It is a pure proxy that relays conversational turns between the caller and the three Intelligence Hub agents.
+- **Models are built/coded, not run, by the agents**: The Hub agents (`gurobot`, `explainer`, `modeler`) can help a person formulate, build, and code optimization models, but running/solving those models is not performed by this service. Any solving that occurs happens remotely inside the Intelligence Hub, opaque to this backend.
+- **No direct solver entitlement held by the service**: The service holds no solver license. It only forwards each user's own Intelligence Hub credentials (Access ID/Secret) to that user's container; whether and how the Hub solves behind the agents is outside this service's responsibility and visibility.

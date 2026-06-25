@@ -8,7 +8,7 @@ without restating implementation details (see [data-model.md](./data-model.md) a
 
 - Ubuntu 24.04 host with Docker running and the `gurobi/mcp:latest` image pulled.
 - Python 3.11+ with the project installed (`pip install -e .` plus dev extras).
-- A **valid Gurobi Intelligence Access ID + Secret** for the integration scenarios (license-bound).
+- **Valid Gurobi Intelligence Hub credentials (Access ID + Secret)** for the integration scenarios. These authenticate to the Hub; this service runs no local solver and holds no solver license.
 - Environment variables set:
 
   | Var | Purpose |
@@ -26,7 +26,7 @@ without restating implementation details (see [data-model.md](./data-model.md) a
 # License-free tests (unit + REST contract) — default CI
 pytest -m "not integration"
 
-# Full round-trips (Docker + Gurobi license required)
+# Full round-trips (Docker + Intelligence Hub credentials required)
 pytest -m integration
 
 # Start the service locally (loopback only)
