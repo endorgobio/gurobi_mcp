@@ -31,10 +31,10 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 **Purpose**: Project skeleton and toolchain
 
-- [ ] T001 Create directory structure (`src/gurobimcp/{auth,containers,chat}/`, `tests/{unit,contract,integration}/`, `deploy/`) per plan.md
-- [ ] T002 Initialize Python project in `pyproject.toml` with deps: fastapi, uvicorn, mcp, docker, passlib[bcrypt], cryptography, PyJWT, SQLAlchemy, pydantic, pydantic-settings, pytest, pytest-asyncio
-- [ ] T003 [P] Configure ruff and mypy (strict mode) in `pyproject.toml` per constitution Technology Stack
-- [ ] T004 [P] Configure pytest in `pyproject.toml` with an `integration` marker and async mode
+- [X] T001 Create directory structure (`src/gurobimcp/{auth,containers,chat}/`, `tests/{unit,contract,integration}/`, `deploy/`) per plan.md
+- [X] T002 Initialize Python project in `pyproject.toml` with deps: fastapi, uvicorn, mcp, docker, passlib[bcrypt], cryptography, PyJWT, SQLAlchemy, pydantic, pydantic-settings, pytest, pytest-asyncio
+- [X] T003 [P] Configure ruff and mypy (strict mode) in `pyproject.toml` per constitution Technology Stack
+- [X] T004 [P] Configure pytest in `pyproject.toml` with an `integration` marker and async mode
 
 ---
 
@@ -44,11 +44,11 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement settings in `src/gurobimcp/config.py` (env: FERNET_KEY, JWT_SECRET, JWT_TTL, IDLE_TIMEOUT_MINUTES, PORT_RANGE=61100-61200, WORKSPACE_ROOT)
-- [ ] T006 [P] Implement SQLite engine + session factory in `src/gurobimcp/db.py`
-- [ ] T007 [P] Implement secret-scrubbing logging filter + structured error handling in `src/gurobimcp/logging.py` (FR-005)
-- [ ] T008 Create FastAPI app + lifespan stub + `GET /health` in `src/gurobimcp/main.py`
-- [ ] T009 [P] Shared pytest fixtures (TestClient, temp SQLite DB) in `tests/conftest.py`
+- [X] T005 Implement settings in `src/gurobimcp/config.py` (env: FERNET_KEY, JWT_SECRET, JWT_TTL, IDLE_TIMEOUT_MINUTES, PORT_RANGE=61100-61200, WORKSPACE_ROOT)
+- [X] T006 [P] Implement SQLite engine + session factory in `src/gurobimcp/db.py`
+- [X] T007 [P] Implement secret-scrubbing logging filter + structured error handling in `src/gurobimcp/logging.py` (FR-005)
+- [X] T008 Create FastAPI app + lifespan stub + `GET /health` in `src/gurobimcp/main.py`
+- [X] T009 [P] Shared pytest fixtures (TestClient, temp SQLite DB) in `tests/conftest.py`
 
 **Checkpoint**: App boots, `/health` responds, DB initializes, secrets are scrubbed from logs
 
