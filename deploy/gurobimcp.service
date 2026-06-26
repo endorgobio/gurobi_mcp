@@ -1,0 +1,35 @@
+# systemd unit for the Gurobi MCP Multi-User Backend (T039, FR-036/SC-010).
+#
+# Install:
+#   sudo cp deploy/gurobimcp.service /etc/systemd/system/gurobimcp.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gurobimcp
+#
+# Secrets live in /etc/gurobimcp/gurobimcp.env (root-owned, chmod 600); they are
+# NOT baked into this unit. The service binds loopback only (FR-033); public
+# access is mediated solely by Caddy (see deploy/Caddyfile).
+
+[Unit]
+Description=Gurobi MCP Multi-User Backend
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=azureuser
+Group=azureuser
+WorkingDirectory=/opt/gurobimcp
+EnvironmentFile=/etc/gurobimcp/gurobimcp.env
+ExecStart=/opt/gurobimcp/.venv/bin/uvicorn gurobimcp.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+
+# Hardening: the service needs the Docker socket but little else.
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

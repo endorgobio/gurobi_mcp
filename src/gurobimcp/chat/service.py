@@ -243,11 +243,12 @@ class DockerMCPBackend:
                     agent, message, structured, [f.name for f in input_files]
                 )
             except Exception as exc:
-                # Even a fresh environment could not serve the turn — surface a
-                # clear, non-internal error rather than a stack trace (FR-031).
+                # Even a fresh environment could not serve the turn — surface the
+                # documented upstream-failure code, not a stack trace (FR-031);
+                # 424 is the contract's "environment/upstream failure" response.
                 raise AppError(
                     "The optimization agent is currently unavailable",
-                    status_code=502,
+                    status_code=424,
                     code="agent_unavailable",
                 ) from exc
         return AgentTurn(

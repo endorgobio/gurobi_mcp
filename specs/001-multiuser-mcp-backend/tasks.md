@@ -151,12 +151,12 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 **Purpose**: Deployment, hardening, and end-to-end validation
 
-- [ ] T039 [P] systemd unit (auto-start, Restart=on-failure) in `deploy/gurobimcp.service` (FR-036/SC-010)
-- [ ] T040 [P] Caddy reverse proxy (HTTPS → 127.0.0.1:8000 as sole entry point) in `deploy/Caddyfile` (FR-032/SC-007)
-- [ ] T041 [P] README with env vars, install, run, and deploy steps in `README.md`
-- [ ] T042 Map capacity exhaustion → 503 and upstream-credential/start failure → 424 across chat routes (edge cases, FR-031)
-- [ ] T043 [P] mypy --strict and ruff clean pass across `src/gurobimcp/`
-- [ ] T044 Execute `quickstart.md` validation scenarios 1–5 and record results
+- [X] T039 [P] systemd unit (auto-start, Restart=on-failure) in `deploy/gurobimcp.service` (FR-036/SC-010)
+- [X] T040 [P] Caddy reverse proxy (HTTPS → 127.0.0.1:8000 as sole entry point) in `deploy/Caddyfile` (FR-032/SC-007)
+- [X] T041 [P] README with env vars, install, run, and deploy steps in `README.md`
+- [X] T042 Map capacity exhaustion → 503 and upstream-credential/start failure → 424 across chat routes (edge cases, FR-031)
+- [X] T043 [P] mypy --strict and ruff clean pass across `src/gurobimcp/`
+- [X] T044 Execute `quickstart.md` validation scenarios 1–5 and record results
 
 ---
 

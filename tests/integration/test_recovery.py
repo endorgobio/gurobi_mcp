@@ -12,6 +12,7 @@ return a valid response flagged ``recovered: true`` — never an internal error.
 from __future__ import annotations
 
 import pathlib
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -20,6 +21,7 @@ from gurobimcp.chat.registry import Registry
 from gurobimcp.chat.service import ChatService, DockerMCPBackend
 from gurobimcp.config import Settings
 from gurobimcp.models import User
+from gurobimcp.reaper import IdleReaper
 from gurobimcp.schemas import ChatRequest
 
 pytestmark = pytest.mark.integration
@@ -45,11 +47,13 @@ _HAVE_CREDS = bool(
 
 
 @pytest.mark.skipif(not _HAVE_CREDS, reason="requires Hub credentials in .env")
-async def test_recovery_after_forced_reclamation() -> None:
-    settings = Settings()
+async def test_recovery_after_idle_reclamation() -> None:
+    # Reap aggressively so a single backdated turn counts as idle.
+    settings = Settings(idle_timeout_minutes=1)
     registry = Registry()
     backend = DockerMCPBackend(registry, settings)
     service = ChatService(registry, backend)
+    reaper = IdleReaper(registry, backend, settings)
 
     user = User(
         id=903,
@@ -75,13 +79,16 @@ async def test_recovery_after_forced_reclamation() -> None:
         assert r1.text
         assert r1.recovered is False
 
-        # Force-stop the container behind the backend's back: the registry still
-        # holds the (now-dead) environment, so the next call must detect staleness.
-        import docker
+        # The idle reaper reclaims the environment while the thread stays active
+        # (the canonical US4 trigger): it stops the container, closes the session,
+        # frees the port, and drops the environment from the registry.
+        registry.environments[user.id].last_used_at = datetime.now(UTC) - timedelta(minutes=5)
+        reaped = await reaper.reap_once()
+        assert user.id in reaped
+        assert user.id not in registry.environments
 
-        docker.from_env().containers.get(f"grbmcp-{user.id}").remove(force=True)
-
-        # Turn 2 — same thread; transparent recovery expected.
+        # Turn 2 — same thread; a fresh environment is started and the turn is
+        # retried transparently, flagged recovered (FR-027/028, SC-003).
         r2 = await service.chat(
             user,
             ChatRequest(

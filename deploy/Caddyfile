@@ -1,0 +1,40 @@
+# Caddy reverse proxy for the Gurobi MCP Multi-User Backend (T040, FR-032/SC-007).
+#
+# Caddy is the SOLE public entry point. It terminates HTTPS (automatic Let's
+# Encrypt certs) on 443 and proxies to the app on loopback. The app and every
+# per-user gurobi/mcp container bind to 127.0.0.1 only (FR-033), so they are
+# unreachable from outside the host except through here.
+#
+# Install:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   # edit the site address below to your real domain, then:
+#   sudo systemctl reload caddy
+#
+# The Azure NSG must allow inbound 80 (ACME challenge) and 443 only — never the
+# app port (8000) or the container port range (61100-61200).
+
+# Replace with your domain. Caddy obtains and renews the TLS cert automatically.
+mcp.example.com {
+	encode zstd gzip
+
+	# Forward everything to the loopback-only backend.
+	reverse_proxy 127.0.0.1:8000 {
+		# Cold starts include a container boot; allow a generous upstream timeout
+		# so the first /chat response (under 5 min, SC-001) is not cut off.
+		transport http {
+			read_timeout 360s
+			write_timeout 360s
+		}
+	}
+
+	# Security headers; HSTS assumes HTTPS-only (the default here).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/gurobimcp.log
+	}
+}

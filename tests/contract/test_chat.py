@@ -179,3 +179,45 @@ def test_end_unknown_conversation_returns_404(chat_client: TestClient) -> None:
     headers = _auth(chat_client)
     resp = chat_client.post("/conversations/ghost/end", headers=headers)
     assert resp.status_code == 404
+
+
+class FailingBackend:
+    """Raises a preset AppError from send_turn — models start/capacity failures."""
+
+    def __init__(self, error: object) -> None:
+        self._error = error
+
+    async def send_turn(self, *args: object, **kwargs: object) -> object:
+        raise self._error
+
+    async def stop(self, user_id: int) -> None:  # pragma: no cover - not used here
+        return None
+
+    async def reconcile(self) -> int:  # pragma: no cover - not used here
+        return 0
+
+
+@pytest.mark.parametrize(
+    ("status_code", "code"),
+    [(503, "capacity_reached"), (424, "agent_unavailable")],
+)
+def test_chat_surfaces_start_and_capacity_errors(
+    client: TestClient, status_code: int, code: str
+) -> None:
+    """Capacity exhaustion → 503 and start/upstream failure → 424 (T042/FR-031)."""
+    from gurobimcp.chat.service import get_chat_service
+    from gurobimcp.errors import AppError
+
+    service = ChatService(
+        Registry(), FailingBackend(AppError("boom", status_code=status_code, code=code))
+    )
+    app.dependency_overrides[get_chat_service] = lambda: service
+
+    headers = _auth(client)
+    resp = client.post(
+        "/chat",
+        json={"conversation_id": "c1", "agent": "gurobot", "message": "hi"},
+        headers=headers,
+    )
+    assert resp.status_code == status_code
+    assert resp.json()["code"] == code
