@@ -136,12 +136,12 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 ### Tests for User Story 4 ⚠️ (write first, must FAIL before implementation)
 
-- [ ] T036 [P] [US4] Integration test: recovery after forced reclamation returns `recovered: true` `[integration]` in `tests/integration/test_recovery.py`
+- [X] T036 [P] [US4] Integration test: recovery after forced reclamation returns `recovered: true` `[integration]` in `tests/integration/test_recovery.py`
 
 ### Implementation for User Story 4
 
-- [ ] T037 [US4] Stale-environment detection + re-provision + single retry + set `recovered=true` in `src/gurobimcp/chat/service.py` (FR-027/028, depends on T027)
-- [ ] T038 [US4] First-message-after-restart recovery using volatile registry + clear upstream/start-failure errors (FR-030/031) in `src/gurobimcp/chat/service.py`
+- [X] T037 [US4] Stale-environment detection + re-provision + single retry + set `recovered=true` in `src/gurobimcp/chat/service.py` (FR-027/028, depends on T027)
+- [X] T038 [US4] First-message-after-restart recovery using volatile registry + clear upstream/start-failure errors (FR-030/031) in `src/gurobimcp/chat/service.py`
 
 **Checkpoint**: All four user stories independently functional
 

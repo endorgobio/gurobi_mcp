@@ -84,6 +84,15 @@ class Registry:
             )
         return existing
 
+    def has_active_conversation(self, conversation_id: str, user_id: int) -> bool:
+        """True if this user already owns an active thread with this id (US4).
+
+        Used to tell a genuine first message apart from a follow-up whose
+        environment was reclaimed: only the latter counts as a recovery.
+        """
+        existing = self._conversations.get(conversation_id)
+        return existing is not None and existing.active and existing.user_id == user_id
+
     def end(self, conversation_id: str, user_id: int) -> None:
         existing = self._conversations.get(conversation_id)
         if existing is None or not existing.active:

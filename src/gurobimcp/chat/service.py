@@ -38,6 +38,10 @@ class AgentTurn:
     text: str | None = None
     structured: dict[str, object] | None = None
     output_files: list[FileRef] = field(default_factory=list)
+    # True when the backend had to (re)provision the environment to serve this
+    # turn — either it was missing (reaped) or its session had gone stale. The
+    # service decides whether that counts as a recovery (US4 / FR-027/028).
+    provisioned: bool = False
 
 
 class EnvironmentBackend(Protocol):
@@ -88,6 +92,11 @@ class ChatService:
                 f"Unknown agent '{req.agent}'", status_code=400, code="invalid_agent"
             ) from exc
 
+        # Capture whether this thread already existed *before* we bind it, so a
+        # transparent re-provision of an active thread can be flagged as a
+        # recovery while a genuine first message is not (FR-027/028).
+        pre_existed = self._registry.has_active_conversation(req.conversation_id, user.id)
+
         try:
             self._registry.bind_or_get(req.conversation_id, user.id, agent)
         except ConversationForbidden as exc:
@@ -111,13 +120,17 @@ class ChatService:
             # successful turn, so last_used_at reflects real progress.
             self._registry.touch(user.id)
 
+        # A recovery is an already-active thread whose environment had to be
+        # rebuilt this turn; a cold start of a brand-new thread is not (FR-028).
+        recovered = pre_existed and turn.provisioned
+
         return ChatResponse(
             conversation_id=req.conversation_id,
             agent=agent.value,
             text=turn.text,
             structured=turn.structured,
             output_files=turn.output_files,
-            recovered=False,  # transparent recovery arrives with US4
+            recovered=recovered,
         )
 
     async def end(self, user: User, conversation_id: str) -> None:
@@ -149,11 +162,21 @@ class DockerMCPBackend:
 
         from gurobimcp.auth.security import decrypt_secret
         from gurobimcp.containers.mcp_client import MCPSession
+        from gurobimcp.containers.port_pool import CapacityError
 
         secret = decrypt_secret(user.grb_secret_enc, self._settings.fernet_key)
-        handle = await asyncio.to_thread(
-            self._manager.start, user.id, user.grb_access_id, secret
-        )
+        try:
+            handle = await asyncio.to_thread(
+                self._manager.start, user.id, user.grb_access_id, secret
+            )
+        except CapacityError as exc:
+            # Port pool exhausted: no partial resources were allocated (allocate
+            # fails first). Surface a clear retryable error (FR-031, SC-008).
+            raise AppError(
+                "The service is at capacity; please try again shortly",
+                status_code=503,
+                code="capacity_reached",
+            ) from exc
         session = MCPSession(
             self._settings.loopback_host, handle.port, self._settings.mcp_path
         )
@@ -191,13 +214,45 @@ class DockerMCPBackend:
         structured: bool,
         input_files: list[FileRef],
     ) -> AgentTurn:
+        # provisioned if there was no live environment when the turn began (cold
+        # start after first message, or after the reaper reclaimed it — FR-030).
+        provisioned = user.id not in self._registry.environments
         env = await self._ensure(user)
         if input_files:
             await asyncio.to_thread(self._write_inputs, env.workspace_path, input_files)
-        reply = await env.session.call(
-            agent, message, structured, [f.name for f in input_files]
+        try:
+            reply = await env.session.call(
+                agent, message, structured, [f.name for f in input_files]
+            )
+        except Exception:
+            # The environment was registered but its session/container is dead
+            # (e.g. reclaimed externally). Tear it down, rebuild, and retry once
+            # with fresh context (FR-027). A clean cold start above will not hit
+            # this path; only a stale live session does.
+            logger.warning(
+                "Session call failed for user %s; rebuilding and retrying", user.id,
+                exc_info=True,
+            )
+            await self.stop(user.id)
+            env = await self._ensure(user)
+            provisioned = True
+            if input_files:
+                await asyncio.to_thread(self._write_inputs, env.workspace_path, input_files)
+            try:
+                reply = await env.session.call(
+                    agent, message, structured, [f.name for f in input_files]
+                )
+            except Exception as exc:
+                # Even a fresh environment could not serve the turn — surface a
+                # clear, non-internal error rather than a stack trace (FR-031).
+                raise AppError(
+                    "The optimization agent is currently unavailable",
+                    status_code=502,
+                    code="agent_unavailable",
+                ) from exc
+        return AgentTurn(
+            text=reply.text, structured=reply.structured, provisioned=provisioned
         )
-        return AgentTurn(text=reply.text, structured=reply.structured)
 
     async def stop(self, user_id: int) -> None:
         env = self._registry.environments.pop(user_id, None)
