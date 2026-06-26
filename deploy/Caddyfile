@@ -17,15 +17,10 @@
 mcp.example.com {
 	encode zstd gzip
 
-	# Forward everything to the loopback-only backend.
-	reverse_proxy 127.0.0.1:8000 {
-		# Cold starts include a container boot; allow a generous upstream timeout
-		# so the first /chat response (under 5 min, SC-001) is not cut off.
-		transport http {
-			read_timeout 360s
-			write_timeout 360s
-		}
-	}
+	# Forward everything to the loopback-only backend. Caddy streams the upstream
+	# response with no timeout by default, so a slow cold start (container boot,
+	# under 5 min — SC-001) is not cut off.
+	reverse_proxy 127.0.0.1:8000
 
 	# Security headers; HSTS assumes HTTPS-only (the default here).
 	header {
