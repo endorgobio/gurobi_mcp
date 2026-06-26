@@ -11,11 +11,13 @@ import importlib
 from collections.abc import Iterator
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from gurobimcp.config import Settings, get_settings
 from gurobimcp.db import Base, get_db
 from gurobimcp.main import app
 
@@ -53,7 +55,14 @@ def client(db_session: Session) -> Iterator[TestClient]:
     def _override_get_db() -> Iterator[Session]:
         yield db_session
 
+    test_settings = Settings(
+        fernet_key=Fernet.generate_key().decode(),
+        jwt_secret="test-secret",
+        jwt_ttl=3600,
+    )
+
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_settings] = lambda: test_settings
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

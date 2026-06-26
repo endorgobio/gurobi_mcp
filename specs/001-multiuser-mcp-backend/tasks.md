@@ -62,17 +62,17 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 ### Tests for User Story 1 ⚠️ (write first, must FAIL before implementation)
 
-- [ ] T010 [P] [US1] Unit tests for bcrypt hashing, Fernet encrypt/decrypt, JWT encode/decode in `tests/unit/test_security.py`
-- [ ] T011 [P] [US1] Contract tests for `POST /auth/register` and `POST /auth/login` (201/400/409/200/401) in `tests/contract/test_auth.py`
+- [X] T010 [P] [US1] Unit tests for bcrypt hashing, Fernet encrypt/decrypt, JWT encode/decode in `tests/unit/test_security.py`
+- [X] T011 [P] [US1] Contract tests for `POST /auth/register` and `POST /auth/login` (201/400/409/200/401) in `tests/contract/test_auth.py`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] `User` ORM model in `src/gurobimcp/models.py` (unique username, password_hash, grb_access_id, grb_secret_enc, last_active_at, allocated_port, container_name, created_at)
-- [ ] T013 [P] [US1] Auth Pydantic schemas (RegisterRequest, LoginRequest, TokenResponse, UserPublic) in `src/gurobimcp/schemas.py`
-- [ ] T014 [US1] Security helpers (hash/verify password, Fernet encrypt/decrypt secret, JWT issue/verify) in `src/gurobimcp/auth/security.py`
-- [ ] T015 [US1] Current-user dependency (Bearer token → User, 401 on missing/expired) in `src/gurobimcp/auth/deps.py` (depends on T014)
-- [ ] T016 [US1] Auth routes register (409 on duplicate, FR-002) + login (401 generic, FR-006) in `src/gurobimcp/auth/routes.py` (depends on T012–T015)
-- [ ] T017 [US1] Wire auth router into `src/gurobimcp/main.py` and apply auth guard to protected routes
+- [X] T012 [P] [US1] `User` ORM model in `src/gurobimcp/models.py` (unique username, password_hash, grb_access_id, grb_secret_enc, last_active_at, allocated_port, container_name, created_at)
+- [X] T013 [P] [US1] Auth Pydantic schemas (RegisterRequest, LoginRequest, TokenResponse, UserPublic) in `src/gurobimcp/schemas.py`
+- [X] T014 [US1] Security helpers (hash/verify password, Fernet encrypt/decrypt secret, JWT issue/verify) in `src/gurobimcp/auth/security.py`
+- [X] T015 [US1] Current-user dependency (Bearer token → User, 401 on missing/expired) in `src/gurobimcp/auth/deps.py` (depends on T014)
+- [X] T016 [US1] Auth routes register (409 on duplicate, FR-002) + login (401 generic, FR-006) in `src/gurobimcp/auth/routes.py` (depends on T012–T015)
+- [X] T017 [US1] Wire auth router into `src/gurobimcp/main.py` and apply auth guard to protected routes
 
 **Checkpoint**: US1 fully functional and independently testable
 

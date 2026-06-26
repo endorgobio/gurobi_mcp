@@ -43,6 +43,13 @@ paths:
         '200': { description: Authenticated, content: { application/json: { schema: { $ref: '#/components/schemas/TokenResponse' } } } }
         '401': { description: Invalid credentials — does not reveal which factor failed (FR-006), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /auth/me:
+    get:
+      summary: Return the authenticated user (protected probe, FR-007)
+      responses:
+        '200': { description: Current user, content: { application/json: { schema: { $ref: '#/components/schemas/UserPublic' } } } }
+        '401': { description: Missing, malformed, or expired token (FR-008), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /chat:
     post:
       summary: Send a message turn to the conversation's agent

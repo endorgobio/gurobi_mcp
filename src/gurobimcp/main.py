@@ -17,21 +17,10 @@ from starlette.requests import Request
 
 from gurobimcp.config import get_settings
 from gurobimcp.db import init_db
+from gurobimcp.errors import AppError
 from gurobimcp.logging import configure_logging
 
 logger = logging.getLogger("gurobimcp")
-
-
-class AppError(Exception):
-    """Base application error carrying an HTTP status and a stable error code."""
-
-    def __init__(
-        self, detail: str, *, status_code: int = 400, code: str = "bad_request"
-    ) -> None:
-        super().__init__(detail)
-        self.detail = detail
-        self.status_code = status_code
-        self.code = code
 
 
 @asynccontextmanager
@@ -64,3 +53,10 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def health() -> dict[str, str]:
     """Liveness probe."""
     return {"status": "ok"}
+
+
+# Routers (auth lands with US1; chat with US2). Imported here, after AppError
+# and the app are defined, to keep module import order acyclic.
+from gurobimcp.auth.routes import router as auth_router  # noqa: E402
+
+app.include_router(auth_router)
