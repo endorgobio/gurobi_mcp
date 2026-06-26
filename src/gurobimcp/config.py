@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     )
     mcp_image: str = Field(default="gurobi/mcp:latest")
     container_port: int = Field(default=61095, description="Port the gurobi/mcp image exposes")
+    mcp_path: str = Field(
+        default="/api/v1/agent/mcp", description="MCP endpoint path inside the image"
+    )
     container_mem_limit: str = Field(default="1g")
     loopback_host: str = Field(default="127.0.0.1")
 

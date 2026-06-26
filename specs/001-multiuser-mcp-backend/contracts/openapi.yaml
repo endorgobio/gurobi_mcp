@@ -138,11 +138,7 @@ components:
         conversation_id: { type: string, description: Caller-supplied thread id (FR-009) }
         agent: { type: string, enum: [gurobot, explainer, modeler], description: Bound on first use, immutable (FR-010/012) }
         message: { type: string }
-        structured: { type: boolean, default: false, description: Proxy-mode structured output (FR-016) }
-        schema:
-          type: object
-          additionalProperties: true
-          description: Optional schema forwarded to the agent's native structured-output capability; not validated by the backend.
+        structured: { type: boolean, default: false, description: When true, also return the agent's native structuredContent if present (FR-016). No request-side schema. }
         input_files:
           type: array
           items: { $ref: '#/components/schemas/FileRef' }

@@ -13,7 +13,7 @@
 ### Session 2026-06-25
 
 - Q: Should the assistant (agent) be selectable per message or fixed for a conversation thread? → A: Each chat request carries an `agent` field (`gurobot` | `explainer` | `modeler`); the agent is bound when a conversation identifier is first seen and stored with the session. Invalid values are rejected before any agent is contacted. A follow-up request whose `agent` differs from the one bound to that conversation is rejected — the agent cannot change mid-conversation, because each agent tracks its own distinct workflow state on the Gurobi side.
-- Q: What does the structured-output option mean for the response contract? → A: Proxy mode. A chat request carries a flag (and optionally a caller-supplied schema) that is forwarded to the agent's native structured-output capability; the backend returns whatever structured payload the agent emits, unmodified. The backend does not invent, validate, or coerce schemas of its own.
+- Q: What does the structured-output option mean for the response contract? → A: Response-side passthrough. A chat request carries a boolean flag only — there is no caller-supplied schema. When the flag is set, the backend returns the agent's native `structuredContent` (a fixed `{"output": ...}` envelope) unmodified if the agent emits one. The upstream `gurobi/mcp` image accepts no request-side schema, so the backend neither accepts, invents, nor enforces one; a caller wanting a particular shape must ask for it in the prompt text. (Confirmed against the live image.)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -49,7 +49,7 @@ A signed-in person starts a chat thread and chooses one agent for it (`gurobot`,
 
 1. **Given** an authenticated person with a new chat thread, **When** they send a first message naming one of the three agents in the `agent` field, **Then** that agent is bound to the thread and they receive that agent's response.
 2. **Given** an active thread where the agent asked a clarifying question, **When** the person sends a follow-up message on the same thread with the same `agent`, **Then** the agent continues the same context instead of restarting.
-3. **Given** a request that asks for structured output (optionally with a schema), **When** the agent responds, **Then** the agent's native structured payload is forwarded back to the caller unmodified, in addition to (or instead of) free-form text.
+3. **Given** a request that sets the structured-output flag, **When** the agent responds, **Then** the agent's native structured payload (when present) is forwarded back to the caller unmodified, alongside the free-form text.
 4. **Given** a request that includes input files, **When** the agent produces output files, **Then** the response returns those output files to the caller.
 5. **Given** two different chat threads owned by the same person, **When** messages are sent to each, **Then** each thread maintains its own independent context and its own bound agent.
 6. **Given** a person explicitly ends a conversation, **When** they later start a new thread, **Then** the new thread begins with fresh context and may bind any agent.
@@ -125,7 +125,7 @@ A person returns to a chat thread after their environment was automatically shut
 - **FR-013**: System MUST continue an existing thread's context when a follow-up message arrives for a conversation that already has active context, rather than starting a new exchange.
 - **FR-014**: System MUST begin a fresh context the first time it sees a given conversation identifier for a person.
 - **FR-015**: System MUST keep the context of distinct conversation threads independent from one another, including multiple threads owned by the same person.
-- **FR-016**: System MUST support both a plain text reply and a structured-output reply, selectable per chat request via a flag (with an optional caller-supplied schema). When structured output is requested, the System MUST forward the request to the agent's native structured-output capability and return the structured payload the agent emits unmodified, without inventing, validating, or coercing schemas of its own.
+- **FR-016**: System MUST support a plain text reply and, when a per-request boolean flag is set, MUST additionally return the agent's native structured payload (`structuredContent`) unmodified when the agent emits one. The System MUST NOT accept, invent, validate, or coerce a caller-supplied output schema — the upstream agents expose no request-side schema; a caller needing a particular shape requests it in the prompt text.
 - **FR-017**: System MUST accept optional input files with a chat message and MUST return any files produced by the agent in the response.
 - **FR-018**: System MUST allow a person to explicitly end a conversation, releasing its retained context.
 

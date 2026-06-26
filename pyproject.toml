@@ -49,6 +49,11 @@ strict = true
 mypy_path = "src"
 packages = ["gurobimcp"]
 
+# Third-party packages without type stubs.
+[[tool.mypy.overrides]]
+module = ["docker.*", "mcp.*"]
+ignore_missing_imports = true
+
 # --- Tests (T004) ---
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

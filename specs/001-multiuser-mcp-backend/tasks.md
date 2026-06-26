@@ -86,21 +86,21 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 ### Tests for User Story 2 ⚠️ (write first, must FAIL before implementation)
 
-- [ ] T018 [P] [US2] Unit tests for `PortPool` allocate/release/exhaustion in `tests/unit/test_port_pool.py`
-- [ ] T019 [P] [US2] Unit tests for conversation/agent binding rules (first-sight bind, switch rejection, invalid agent) in `tests/unit/test_registry.py`
-- [ ] T020 [P] [US2] Contract tests for `POST /chat` and `POST /conversations/{id}/end` (200/400/401/403) in `tests/contract/test_chat.py`
-- [ ] T021 [P] [US2] Integration test: two-turn round-trip preserves context `[integration]` in `tests/integration/test_chat_roundtrip.py`
+- [X] T018 [P] [US2] Unit tests for `PortPool` allocate/release/exhaustion in `tests/unit/test_port_pool.py`
+- [X] T019 [P] [US2] Unit tests for conversation/agent binding rules (first-sight bind, switch rejection, invalid agent) in `tests/unit/test_registry.py`
+- [X] T020 [P] [US2] Contract tests for `POST /chat` and `POST /conversations/{id}/end` (200/400/401/403) in `tests/contract/test_chat.py`
+- [X] T021 [P] [US2] Integration test: two-turn round-trip preserves context `[integration]` in `tests/integration/test_chat_roundtrip.py`
 
 ### Implementation for User Story 2
 
-- [ ] T022 [P] [US2] `PortPool` over 61100–61200 with lock + CapacityError in `src/gurobimcp/containers/port_pool.py`
-- [ ] T023 [P] [US2] In-memory registry (UserEnvironment, Conversation, agent binding, last_used) in `src/gurobimcp/chat/registry.py`
-- [ ] T024 [P] [US2] Chat schemas (ChatRequest, ChatResponse, FileRef) in `src/gurobimcp/schemas.py`
-- [ ] T025 [US2] Container manager: Docker run (loopback bind, env creds, workspace mount, mem_limit), stop/remove, readiness poll in `src/gurobimcp/containers/manager.py` (depends on T022)
-- [ ] T026 [US2] MCP client wrapper: persistent ClientSession, initialize, `call_tool` per agent, structured-output forwarding in `src/gurobimcp/containers/mcp_client.py` (depends on T025)
-- [ ] T027 [US2] Chat service: ensure-environment, bind/validate agent, send turn, structured output (proxy mode FR-016), file I/O via workspace, per-user lock serialization (FR-029) in `src/gurobimcp/chat/service.py` (depends on T023, T026)
-- [ ] T028 [US2] Chat routes `POST /chat` + `POST /conversations/{id}/end` (FR-011/012/018, 403 cross-user FR-025) in `src/gurobimcp/chat/routes.py` (depends on T024, T027)
-- [ ] T029 [US2] Wire chat router into `src/gurobimcp/main.py`
+- [X] T022 [P] [US2] `PortPool` over 61100–61200 with lock + CapacityError in `src/gurobimcp/containers/port_pool.py`
+- [X] T023 [P] [US2] In-memory registry (UserEnvironment, Conversation, agent binding, last_used) in `src/gurobimcp/chat/registry.py`
+- [X] T024 [P] [US2] Chat schemas (ChatRequest, ChatResponse, FileRef) in `src/gurobimcp/schemas.py`
+- [X] T025 [US2] Container manager: Docker run (loopback bind, env creds, workspace mount, mem_limit), stop/remove, readiness poll in `src/gurobimcp/containers/manager.py` (depends on T022)
+- [X] T026 [US2] MCP client wrapper: persistent ClientSession, initialize, `call_tool` per agent, structured-output forwarding in `src/gurobimcp/containers/mcp_client.py` (depends on T025)
+- [X] T027 [US2] Chat service: ensure-environment, bind/validate agent, send turn, structured output (proxy mode FR-016), file I/O via workspace, per-user lock serialization (FR-029) in `src/gurobimcp/chat/service.py` (depends on T023, T026)
+- [X] T028 [US2] Chat routes `POST /chat` + `POST /conversations/{id}/end` (FR-011/012/018, 403 cross-user FR-025) in `src/gurobimcp/chat/routes.py` (depends on T024, T027)
+- [X] T029 [US2] Wire chat router into `src/gurobimcp/main.py`
 
 **Checkpoint**: US1 + US2 work independently — this is the demoable MVP
 

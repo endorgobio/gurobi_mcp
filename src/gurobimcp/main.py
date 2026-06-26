@@ -58,5 +58,7 @@ async def health() -> dict[str, str]:
 # Routers (auth lands with US1; chat with US2). Imported here, after AppError
 # and the app are defined, to keep module import order acyclic.
 from gurobimcp.auth.routes import router as auth_router  # noqa: E402
+from gurobimcp.chat.routes import router as chat_router  # noqa: E402
 
 app.include_router(auth_router)
+app.include_router(chat_router)
