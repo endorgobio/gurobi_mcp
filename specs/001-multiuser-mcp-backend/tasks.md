@@ -114,15 +114,15 @@ Single-project backend: package at `src/gurobimcp/`, tests at `tests/`, deployme
 
 ### Tests for User Story 3 ⚠️ (write first, must FAIL before implementation)
 
-- [ ] T030 [P] [US3] Unit tests for reaper idle-selection and port-release logic in `tests/unit/test_reaper.py`
-- [ ] T031 [P] [US3] Integration test: isolation between two users + idle reaping `[integration]` in `tests/integration/test_isolation_reaping.py`
+- [X] T030 [P] [US3] Unit tests for reaper idle-selection and port-release logic in `tests/unit/test_reaper.py`
+- [X] T031 [P] [US3] Integration test: isolation between two users + idle reaping `[integration]` in `tests/integration/test_isolation_reaping.py`
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Idle-reaper asyncio loop (scan registry, stop environments idle > IDLE_TIMEOUT_MINUTES, close session, release port) in `src/gurobimcp/reaper.py` (depends on T023, T025)
-- [ ] T033 [US3] Update `last_used_at` on each turn under the user lock in `src/gurobimcp/chat/service.py` (FR-023)
-- [ ] T034 [US3] Per-user workspace isolation + assert loopback-only publish in `src/gurobimcp/containers/manager.py` (FR-022/033)
-- [ ] T035 [US3] Start reaper in lifespan + boot-time reconciliation (remove orphan `grbmcp-*`, reset pool) in `src/gurobimcp/main.py` (depends on T032)
+- [X] T032 [US3] Idle-reaper asyncio loop (scan registry, stop environments idle > IDLE_TIMEOUT_MINUTES, close session, release port) in `src/gurobimcp/reaper.py` (depends on T023, T025)
+- [X] T033 [US3] Update `last_used_at` on each turn under the user lock in `src/gurobimcp/chat/service.py` (FR-023)
+- [X] T034 [US3] Per-user workspace isolation + assert loopback-only publish in `src/gurobimcp/containers/manager.py` (FR-022/033)
+- [X] T035 [US3] Start reaper in lifespan + boot-time reconciliation (remove orphan `grbmcp-*`, reset pool) in `src/gurobimcp/main.py` (depends on T032)
 
 **Checkpoint**: US1–US3 independently functional; resources reclaimed safely
 

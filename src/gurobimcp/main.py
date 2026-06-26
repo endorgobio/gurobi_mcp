@@ -7,6 +7,8 @@ in later phases (US1–US4).
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -29,9 +31,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     logger.info("Starting gurobimcp on %s:%s", settings.app_host, settings.app_port)
     init_db()
-    # NOTE: idle reaper (US3) and orphan-container reconciliation are wired later.
-    yield
-    logger.info("Shutting down gurobimcp")
+
+    # US3: reclaim orphan containers from a previous process, then start the idle
+    # reaper on the live chat service's registry/backend (FR-024/026). Both are
+    # best-effort so the app still boots on a host without Docker (license-free CI).
+    from gurobimcp.chat.service import get_chat_service
+    from gurobimcp.reaper import IdleReaper
+
+    service = get_chat_service()
+    with contextlib.suppress(Exception):
+        await service.backend.reconcile()
+    reaper = IdleReaper(service.registry, service.backend, settings)
+    reaper_task = asyncio.create_task(reaper.run())
+
+    try:
+        yield
+    finally:
+        reaper_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await reaper_task
+        logger.info("Shutting down gurobimcp")
 
 
 app = FastAPI(

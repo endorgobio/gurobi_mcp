@@ -54,12 +54,24 @@ class EnvironmentBackend(Protocol):
 
     async def stop(self, user_id: int) -> None: ...
 
+    async def reconcile(self) -> int:
+        """Remove orphan environments left by a previous process (boot-time)."""
+        ...
+
 
 class ChatService:
     def __init__(self, registry: Registry, backend: EnvironmentBackend) -> None:
         self._registry = registry
         self._backend = backend
         self._locks: dict[int, asyncio.Lock] = {}
+
+    @property
+    def registry(self) -> Registry:
+        return self._registry
+
+    @property
+    def backend(self) -> EnvironmentBackend:
+        return self._backend
 
     def _lock(self, user_id: int) -> asyncio.Lock:
         lock = self._locks.get(user_id)
@@ -94,6 +106,9 @@ class ChatService:
                 req.structured,
                 req.input_files,
             )
+            # Record the most-recent interaction so the idle reaper sees activity
+            # and resets the timer (FR-023). Done under the lock, after a
+            # successful turn, so last_used_at reflects real progress.
             self._registry.touch(user.id)
 
         return ChatResponse(
@@ -191,6 +206,10 @@ class DockerMCPBackend:
         handle = self._handles.pop(user_id, None)
         if handle is not None:
             await asyncio.to_thread(self._manager.stop, handle)
+
+    async def reconcile(self) -> int:
+        """Remove orphan containers from a previous process (boot-time, FR-026)."""
+        return await asyncio.to_thread(self._manager.reconcile)
 
 
 _service: ChatService | None = None
